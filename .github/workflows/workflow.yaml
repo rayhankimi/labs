@@ -20,8 +20,7 @@ concurrency:
 
 jobs:
   validate:
-    if: false
-    #if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -48,8 +47,7 @@ jobs:
           content: "Validation: ${{ job.status }}"
 
   build:
-    if: false
-    #if: github.event_name == 'push'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       ecr_registry: ${{ steps.build.outputs.ecr_registry }}
