@@ -1,0 +1,82 @@
+name: Labs Workflow
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPO: ${{ vars.ECR_REPO }}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  validate:
+    if: false
+    #if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Ruff lint
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: 'check --output-format=github'
+
+      - name: Ruff format check
+        uses: astral-sh/ruff-action@v3
+        with:
+          args: 'format --check'
+
+      - name: Docker build (no push)
+        run: docker build -t validate:${{ github.sha }} .
+
+      - name: Notify
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: ${{ job.status }}
+          content: "Validation: ${{ job.status }}"
+
+  build:
+    if: false
+    #if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      ecr_registry: ${{ steps.build.outputs.ecr_registry }}
+      ecr_image: ${{ steps.build.outputs.ecr_image }}
+      image_tag: ${{ steps.build.outputs.image_tag }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+
+      - name: Ensure ECR repository
+        run: |
+          aws ecr describe-repositories --repository-names "$ECR_REPO" > /dev/null 2>&1 || \
+            aws ecr create-repository --repository-name "$ECR_REPO" --image-scanning-configuration scanOnPush=true
+
+      - name: Build and push
+        id: build
+        run: bash .github/sc/build.sh
+
+      - name: Notify
+        if: always()
+        uses: sarisia/actions-status-discord@v1
+        with:
+          webhook: ${{ secrets.DISCORD_WEBHOOK }}
+          status: ${{ job.status }}
+          content: "Build: ${{ job.status }} · ${{ steps.build.outputs.image_tag || 'no tag' }}"

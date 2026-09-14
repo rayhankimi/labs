@@ -1,0 +1,9 @@
+# /etc/logrotate.d/myapp
+/var/log/myapp/app.log {
+    daily
+    rotate 7
+    compress
+    missingok
+    notifempty
+    copytruncate
+}

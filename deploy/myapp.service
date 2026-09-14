@@ -1,0 +1,20 @@
+# /etc/systemd/system/myapp.service
+[Unit]
+Description=FastAPI lab app
+After=network.target
+
+[Service]
+User=app
+Group=app
+WorkingDirectory=/opt/myapp
+EnvironmentFile=/etc/myapp/env
+ExecStart=/opt/myapp/venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=3
+
+# stdout/stderr -> journald (lihat: journalctl -u myapp -f)
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
